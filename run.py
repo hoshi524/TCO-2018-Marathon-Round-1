@@ -3,8 +3,9 @@ import json
 import threading
 import queue
 import json
+import sys
 
-subprocess.call('g++ --std=c++0x -W -Wall -O2 -s -pipe -mmmx -msse -msse2 -msse3 -o out/main.out src/main.cpp', shell=True)
+subprocess.call('g++ --std=c++0x -W -Wall -O2 -s -pipe -mmmx -msse -msse2 -msse3 -o out/main.out {}'.format(sys.argv[1]), shell=True)
 subprocess.call('javac -d out src/RoadsAndJunctionsVis.java', shell=True)
 
 scorefile = "best-score.json"
