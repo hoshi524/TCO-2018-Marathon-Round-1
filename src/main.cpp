@@ -15,6 +15,72 @@ inline unsigned get_random() {
   return y ^= (y ^= (y ^= y << 13) >> 17) << 5;
 }
 
+void fermatPoint(double x1, double y1, double x2, double y2, double x3,
+                 double y3, double& x, double& y) {
+  static double pi = acos(-1);
+  static double pi23 = pi * 2 / 3;
+  auto angle = [&](double x1, double y1, double x2, double y2, double x3,
+                   double y3) {
+    double d1x = x2 - x1;
+    double d1y = y2 - y1;
+    double d2x = x2 - x3;
+    double d2y = y2 - y3;
+    double x = (d1x * d2x + d1y * d2y) /
+               sqrt((d1x * d1x + d1y * d1y) * (d2x * d2x + d2y * d2y));
+    return acos(x);
+  };
+  {
+    double t = max({
+        angle(x1, y1, x2, y2, x3, y3),
+        angle(x2, y2, x3, y3, x1, y1),
+        angle(x3, y3, x1, y1, x2, y2),
+    });
+    if (isnan(t) or t + 1e-10 >= pi23) {
+      x = -1;
+      y = -1;
+      return;
+    }
+  }
+  auto E = [&](double x1, double y1, double x2, double y2, double x3, double y3,
+               double& x, double& y) {
+    static double sin_ = sin(pi / 3);
+    static double cos_ = cos(pi / 3);
+    double dx = x2 - x1;
+    double dy = y2 - y1;
+    double tx1, ty1, tx2, ty2;
+    tx1 = x1 + (dx * cos_ - dy * sin_);
+    ty1 = y1 + (dx * sin_ + dy * cos_);
+    tx2 = x1 + (dx * cos_ + dy * sin_);
+    ty2 = y1 + (-dx * sin_ + dy * cos_);
+    auto D = [](double x1, double y1, double x2, double y2) {
+      double x = x1 - x2;
+      double y = y1 - y2;
+      return sqrt(x * x + y * y);
+    };
+    if (D(x3, y3, tx1, ty1) > D(x3, y3, tx2, ty2)) {
+      x = tx1;
+      y = ty1;
+    } else {
+      x = tx2;
+      y = ty2;
+    }
+  };
+  double dx2, dy2, dx3, dy3;
+  E(x1, y1, x3, y3, x2, y2, dx2, dy2);
+  E(x1, y1, x2, y2, x3, y3, dx3, dy3);
+  {
+    double a = (dy3 - y3) * (dx3 - x2) - (dx3 - x3) * (dy3 - y2);
+    double b = (dx2 - x2) * (dy3 - y3) - (dy2 - y2) * (dx3 - x3);
+    double c = a / b;
+    x = x2 + c * (dx2 - x2);
+    y = y2 + c * (dy2 - y2);
+  }
+  auto check = [&](double a) { assert(abs(a - pi23) < 1e-5); };
+  check(angle(x1, y1, x, y, x2, y2));
+  check(angle(x2, y2, x, y, x3, y3));
+  check(angle(x3, y3, x, y, x1, y1));
+}
+
 constexpr double TIME_LIMIT = 2;
 constexpr int MAX_N = 1 << 8;
 
@@ -27,6 +93,10 @@ struct Node {
   Node* edge[MAX_N];
 };
 Node node[MAX_N];
+
+inline void fermatPoint(Node& a, Node& b, Node& c, Node& d) {
+  fermatPoint(a.x, a.y, b.x, b.y, c.x, c.y, d.x, d.y);
+}
 
 double calcDistance(Node& a, Node& b) {
   double x = a.x - b.x;
@@ -120,34 +190,6 @@ class RoadsAndJunctions {
             value = prim() + (N - NC) * junctionCost;
           }
         }
-        if (false) {  // centroid
-          init();
-          for (int t = 0; t < 1; ++t) {
-            for (int i = NC; i < N; ++i) {
-              Node& n = node[i];
-              n.x = 0;
-              n.y = 0;
-              for (int j = 0; j < n.size; ++j) {
-                Node& m = *n.edge[j];
-                n.x += m.x;
-                n.y += m.y;
-              }
-              n.x /= n.size;
-              n.y /= n.size;
-            }
-          }
-          for (int i = NC; i < N; ++i) {
-            Node& n = node[i];
-            pos[i - NC][0] = n.x;
-            pos[i - NC][1] = n.y;
-          }
-          {
-            init();
-            double t = prim() + (N - NC) * junctionCost;
-            assert(t <= value);
-          }
-          value = prim() + (N - NC) * junctionCost;
-        }
       };
       int o = get_random() % 2;
       if (o == 0) {
@@ -161,8 +203,8 @@ class RoadsAndJunctions {
         Node& b = *a.edge[i0];
         Node& c = *a.edge[i1];
         Node& d = node[N++];
-        d.x = (a.x + b.x + c.x) / 3;
-        d.y = (a.y + b.y + c.y) / 3;
+        fermatPoint(a, b, c, d);
+        if (d.x < 0) continue;
         double v = prim() + (N - NC) * junctionCost;
         if (value > v) {
           value = v;
