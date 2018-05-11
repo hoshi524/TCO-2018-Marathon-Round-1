@@ -407,8 +407,8 @@ public class RoadsAndJunctionsVis {
                 seed = args[++i];
             if (args[i].equals("-exec"))
                 exec = args[++i];
-            if (args[i].equals("-novis"))
-                vis = false;
+            if (args[i].equals("-vis"))
+                vis = true;
             if (args[i].equals("-debug"))
                 debug = true;
         }

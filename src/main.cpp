@@ -35,7 +35,7 @@ void fermatPoint(double x1, double y1, double x2, double y2, double x3,
         angle(x2, y2, x3, y3, x1, y1),
         angle(x3, y3, x1, y1, x2, y2),
     });
-    if (isnan(t) or t + 1e-10 >= pi23) {
+    if (isnan(t) or t >= pi23 * 0.98) {
       x = -1;
       y = -1;
       return;
