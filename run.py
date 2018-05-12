@@ -22,7 +22,7 @@ if case > len(scores):
     scores = [999999] * case
 
 def solve(seed):
-    return float(subprocess.check_output('java -cp out RoadsAndJunctionsVis -exec out/main.out -seed {}'.format(seed), shell=True))
+    return float(subprocess.check_output('java -cp out RoadsAndJunctionsVis -exec out/main.out -seed {} -vis'.format(seed), shell=True))
 
 class State:
     count = 0

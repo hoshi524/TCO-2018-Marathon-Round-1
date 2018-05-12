@@ -365,7 +365,7 @@ public class RoadsAndJunctionsVis {
         }
 
         try {
-            ImageIO.write(bi, "png", new File(fileName + ".png"));
+            ImageIO.write(bi, "png", new File("out/" + fileName + ".png"));
         } catch (Exception e) {
             e.printStackTrace();
         }
