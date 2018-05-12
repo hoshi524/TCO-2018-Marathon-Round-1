@@ -2,18 +2,11 @@
 #include <sys/time.h>
 using namespace std;
 
-constexpr double ticks_per_sec = 2800000000;
-constexpr double ticks_per_sec_inv = 1.0 / ticks_per_sec;
-inline double rdtsc() {
-  uint64_t lo, hi;
-  asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
-  return ((hi << 32) | lo) * ticks_per_sec_inv;
-}
-
-inline unsigned get_random() {
-  static unsigned y = 2463534242;
-  return y ^= (y ^= (y ^= y << 13) >> 17) << 5;
-}
+double dist(double x1, double y1, double x2, double y2) {
+  double x = x1 - x2;
+  double y = y1 - y2;
+  return sqrt(x * x + y * y);
+};
 
 void fermatPoint(double x1, double y1, double x2, double y2, double x3,
                  double y3, double& x, double& y) {
@@ -35,7 +28,7 @@ void fermatPoint(double x1, double y1, double x2, double y2, double x3,
         angle(x2, y2, x3, y3, x1, y1),
         angle(x3, y3, x1, y1, x2, y2),
     });
-    if (isnan(t) or t >= pi23 * 0.98) {
+    if (std::isnan(t) or t >= pi23 * 0.98) {
       x = -1;
       y = -1;
       return;
@@ -52,12 +45,7 @@ void fermatPoint(double x1, double y1, double x2, double y2, double x3,
     ty1 = y1 + (dx * sin_ + dy * cos_);
     tx2 = x1 + (dx * cos_ + dy * sin_);
     ty2 = y1 + (-dx * sin_ + dy * cos_);
-    auto D = [](double x1, double y1, double x2, double y2) {
-      double x = x1 - x2;
-      double y = y1 - y2;
-      return sqrt(x * x + y * y);
-    };
-    if (D(x3, y3, tx1, ty1) > D(x3, y3, tx2, ty2)) {
+    if (dist(x3, y3, tx1, ty1) > dist(x3, y3, tx2, ty2)) {
       x = tx1;
       y = ty1;
     } else {
@@ -87,21 +75,34 @@ constexpr int MAX_N = 1 << 8;
 int N, NC;
 
 struct Node {
-  int id, size;
+  int id, size, x, y;
   bool used;
-  double x, y;
   Node* edge[MAX_N];
 };
 Node node[MAX_N];
 
-inline void fermatPoint(Node& a, Node& b, Node& c, Node& d) {
-  fermatPoint(a.x, a.y, b.x, b.y, c.x, c.y, d.x, d.y);
-}
+inline double dist(Node& a, Node& b) { return dist(a.x, a.y, b.x, b.y); }
 
-double calcDistance(Node& a, Node& b) {
-  double x = a.x - b.x;
-  double y = a.y - b.y;
-  return sqrt(x * x + y * y);
+inline void fermatPoint(Node& a, Node& b, Node& c, Node& d) {
+  double x, y;
+  fermatPoint(a.x, a.y, b.x, b.y, c.x, c.y, x, y);
+  if (x < 0) {
+    d.x = -1;
+    d.y = -1;
+  } else {
+    double v = 1e10;
+    for (int i = x, ie = i + 2; i < ie; ++i) {
+      for (int j = y, je = j + 2; j < je; ++j) {
+        double t =
+            dist(i, j, a.x, a.y) + dist(i, j, b.x, b.y) + dist(i, j, c.x, c.y);
+        if (v > t) {
+          v = t;
+          d.x = i;
+          d.y = j;
+        }
+      }
+    }
+  }
 }
 
 double prim() {
@@ -114,7 +115,7 @@ double prim() {
     used[i] = node[i].used;
     node[i].size = 0;
     for (int j = i + 1; j < N; ++j) {
-      double d = calcDistance(node[i], node[j]);
+      double d = dist(node[i], node[j]);
       D[i][j] = d;
       D[j][i] = d;
     }
@@ -158,9 +159,8 @@ class RoadsAndJunctions {
       n.y = cities[i * 2 + 1];
       n.used = false;
     }
-    double pos[MAX_N][2];
+    int pos[MAX_N][2];
     int ps = 0;
-    double value = prim(), first = value;
     auto init = [&]() {
       N = NC + ps;
       for (int i = 0; i < ps; ++i) {
@@ -169,102 +169,63 @@ class RoadsAndJunctions {
         n.y = pos[i][1];
       }
     };
-    for (int T = 0; T < 0xffff; ++T) {
+    while (true) {
+      double value = -1, x = -1, y = -1;
       init();
-      auto adjust = [&]() {
-        {  // remove2
-          bool exe = false;
-          for (int i = NC; i < NC + ps; ++i) {
-            Node& n = node[i];
-            if (n.size < 3) {
-              --ps;
-              n.size = node[NC + ps].size;
-              pos[i - NC][0] = pos[ps][0];
-              pos[i - NC][1] = pos[ps][1];
-              --i;
-              exe = true;
+      prim();
+      Node& d = node[N];
+      for (int i = 0; i < N; ++i) {
+        Node& a = node[i];
+        int s = a.size;
+        for (int j = 0; j < s; ++j) {
+          Node& b = *a.edge[j];
+          for (int k = j + 1; k < s; ++k) {
+            Node& c = *a.edge[k];
+            fermatPoint(a, b, c, d);
+            if (d.x < 0) continue;
+            d.x = round(d.x);
+            d.y = round(d.y);
+            double v =
+                dist(a, b) + dist(a, c) - dist(d, a) - dist(d, b) - dist(d, c);
+            if (value < v) {
+              value = v;
+              x = d.x;
+              y = d.y;
             }
           }
-          if (exe) {
-            init();
-            value = prim() + (N - NC) * junctionCost;
+        }
+      }
+      if (value * (1 - failureProbability) <= junctionCost) break;
+      pos[ps][0] = x;
+      pos[ps][1] = y;
+      ++ps;
+      {
+        init();
+        prim();
+        for (int i = NC; i < NC + ps; ++i) {
+          Node& n = node[i];
+          if (n.size < 3) {
+            --ps;
+            n.size = node[NC + ps].size;
+            pos[i - NC][0] = pos[ps][0];
+            pos[i - NC][1] = pos[ps][1];
+            --i;
+          } else if (n.size == 3) {
+            fermatPoint(*n.edge[0], *n.edge[1], *n.edge[2], n);
+            pos[i - NC][0] = n.x;
+            pos[i - NC][1] = n.y;
           }
-        }
-      };
-      int o = get_random() % 2;
-      if (o == 0) {
-        // add
-        Node& a = node[get_random() % N];
-        if (a.size < 2) continue;
-        int i0 = get_random() % a.size, i1;
-        do {
-          i1 = get_random() % a.size;
-        } while (i0 == i1);
-        Node& b = *a.edge[i0];
-        Node& c = *a.edge[i1];
-        Node& d = node[N++];
-        fermatPoint(a, b, c, d);
-        if (d.x < 0) continue;
-        double v = prim() + (N - NC) * junctionCost;
-        if (value > v) {
-          value = v;
-          pos[ps][0] = d.x;
-          pos[ps][1] = d.y;
-          ++ps;
-          adjust();
-        }
-      } else if (o == 1) {
-        // merge
-        if (ps < 1) continue;
-        Node& a = node[NC + get_random() % ps];
-        Node& b = *a.edge[get_random() % a.size];
-        Node& c = node[--N];
-        if (b.id >= NC) {
-          int t = 0;
-          double x = 0, y = 0;
-          auto add = [&](Node& e) {
-            for (int i = 0; i < e.size; ++i) {
-              Node& n = *e.edge[i];
-              if (n.id == a.id) continue;
-              if (n.id == b.id) continue;
-              x += n.x;
-              y += n.y;
-              t++;
-            }
-          };
-          add(a);
-          add(b);
-          b.x = x / t;
-          b.y = y / t;
-        }
-        a.x = c.x;
-        a.y = c.y;
-        double v = prim() + (N - NC) * junctionCost;
-        if (value > v) {
-          value = v;
-          pos[a.id - NC][0] = a.x;
-          pos[a.id - NC][1] = a.y;
-          if (b.id >= NC) {
-            pos[b.id - NC][0] = b.x;
-            pos[b.id - NC][1] = b.y;
-          }
-          --ps;
-          adjust();
         }
       }
     }
     {
-      for (int i = 0; i < ps; ++i) {
-        pos[i][0] = round(pos[i][0]);
-        pos[i][1] = round(pos[i][1]);
-      }
       init();
       for (int i = 0; i < ps; ++i) {
         int c = 0;
         for (int j = 0; j < N; ++j) {
           Node& n = node[j];
-          if (abs(pos[i][0] - n.x) > 0.5) continue;
-          if (abs(pos[i][1] - n.y) > 0.5) continue;
+          if (pos[i][0] != n.x) continue;
+          if (pos[i][1] != n.y) continue;
           ++c;
         }
         if (c > 1) {
