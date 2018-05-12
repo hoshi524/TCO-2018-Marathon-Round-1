@@ -191,11 +191,11 @@ class RoadsAndJunctions {
           }
         }
       }
-      if (value <= junctionCost) break;
+      if (value * (1 - failureProbability) <= junctionCost) break;
       pos[ps][0] = x;
       pos[ps][1] = y;
       ++ps;
-      {  // remove2
+      {
         init();
         prim();
         for (int i = NC; i < NC + ps; ++i) {
@@ -206,6 +206,10 @@ class RoadsAndJunctions {
             pos[i - NC][0] = pos[ps][0];
             pos[i - NC][1] = pos[ps][1];
             --i;
+          } else if (n.size == 3) {
+            fermatPoint(*n.edge[0], *n.edge[1], *n.edge[2], n);
+            pos[i - NC][0] = n.x;
+            pos[i - NC][1] = n.y;
           }
         }
       }

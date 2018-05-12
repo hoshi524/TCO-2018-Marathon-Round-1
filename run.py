@@ -33,6 +33,7 @@ class State:
         if scores[seed] > score:
             scores[seed] = score
         nom = scores[seed] / score
+        nom = nom * nom
         with self.lock:
             self.count = self.count + 1
             self.rate = (self.rate * (self.count - 1) + nom) / self.count
