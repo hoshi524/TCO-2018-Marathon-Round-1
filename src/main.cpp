@@ -330,8 +330,8 @@ class RoadsAndJunctions {
       }
     }
     {
-      init();
       for (int i = 0; i < ps; ++i) {
+        init();
         int c = 0;
         for (int j = 0; j < N; ++j) {
           Node& n = node[j];
