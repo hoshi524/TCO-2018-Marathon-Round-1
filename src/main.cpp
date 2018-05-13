@@ -108,39 +108,33 @@ double prim() {
   static double mincost[MAX_N];
   static Node* minedge[MAX_N];
   static bool used[MAX_N];
-  static double D[MAX_N][MAX_N];
   for (int i = 0; i < N; ++i) {
     mincost[i] = 100000;
     used[i] = node[i].used;
     node[i].size = 0;
-    for (int j = i + 1; j < N; ++j) {
-      double d = dist(node[i], node[j]);
-      D[i][j] = d;
-      D[j][i] = d;
-    }
   }
-  mincost[0] = 0;
+  int v = 0;
+  mincost[v] = 0;
   double d = 0;
   while (true) {
-    int v = -1;
-    for (int u = 0; u < N; ++u) {
-      if (!used[u] and (v == -1 or mincost[u] < mincost[v])) v = u;
-    }
-    if (v == -1) return d;
-    if (mincost[v] > 1e-10) {
-      Node& a = node[v];
-      Node& b = *minedge[v];
-      a.edge[a.size++] = &b;
-      b.edge[b.size++] = &a;
-      d += mincost[v];
-    }
     used[v] = true;
-    for (int u = 0; u < N; ++u) {
-      if (mincost[u] > D[v][u]) {
-        mincost[u] = D[v][u];
+    int nv = -1;
+    for (int u = 1; u < N; ++u) {
+      if (used[u]) continue;
+      double d = dist(node[v], node[u]);
+      if (mincost[u] > d) {
+        mincost[u] = d;
         minedge[u] = &node[v];
       }
+      if (nv == -1 or mincost[u] < mincost[nv]) nv = u;
     }
+    if (nv == -1) return d;
+    v = nv;
+    Node& a = node[v];
+    Node& b = *minedge[v];
+    a.edge[a.size++] = &b;
+    b.edge[b.size++] = &a;
+    d += mincost[v];
   }
 }
 
@@ -220,7 +214,7 @@ class RoadsAndJunctions {
         prim();
         for (int i = NC; i < NC + ps; ++i) {
           Node& n = node[i];
-          assert(n.size == 3);
+          assert(n.size > 2);
           fermatPoint(*n.edge[0], *n.edge[1], *n.edge[2], n);
           pos[i - NC][0] = n.x;
           pos[i - NC][1] = n.y;
@@ -264,15 +258,13 @@ class RoadsAndJunctions {
             prob[i + 1][j + 1] += prob[i][j] * (1 - failureProbability);
           }
         }
-      }
-      int comb[MAX + 1][MAX + 1];
-      {
-        memset(comb, 0, sizeof(comb));
+        int comb[MAX + 1][MAX + 1];
         for (int i = 0; i <= MAX; ++i) {
           comb[i][0] = 1;
           if (i == 0) continue;
           for (int j = 1; j <= i; ++j) {
             comb[i][j] = comb[i - 1][j - 1] + comb[i - 1][j];
+            prob[i][j] /= comb[i][j];
           }
         }
       }
@@ -285,6 +277,7 @@ class RoadsAndJunctions {
       for (int i = NC; i < PN; ++i) {
         vector<int> nl;
         Node& n = node[i];
+        assert(n.size == 3);
         auto add = [&](int a, int b) {
           for (int i = 0; i < 4; ++i) {
             int x = a + dx[i];
@@ -323,7 +316,7 @@ class RoadsAndJunctions {
               }
             }
             double d = i == 0 ? d0 : (b - 1) + D[0] + D[1] + D[2];
-            x += d * prob[s][b] / comb[s][b];
+            x += d * prob[s][b];
           }
           return x;
         };
