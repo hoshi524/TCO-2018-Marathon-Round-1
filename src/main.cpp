@@ -27,7 +27,7 @@ void fermatPoint(double x1, double y1, double x2, double y2, double x3,
         angle(x2, y2, x3, y3, x1, y1),
         angle(x3, y3, x1, y1, x2, y2),
     });
-    if (std::isnan(t) or t >= pi23 * 0.98) {
+    if (std::isnan(t) or t >= pi23 * 0.98 or t == 0) {
       x = -1;
       y = -1;
       return;
@@ -171,21 +171,26 @@ class RoadsAndJunctions {
     while (true) {
       double value = -1, x = -1, y = -1;
       init();
-      prim();
-      Node& d = node[N];
-      for (int i = 0; i < N; ++i) {
+      double current = prim();
+      Node& d = node[N++];
+      for (int i = 0; i + 1 < N; ++i) {
         Node& a = node[i];
-        int s = a.size;
-        for (int j = 0; j < s; ++j) {
-          Node& b = *a.edge[j];
-          for (int k = j + 1; k < s; ++k) {
-            Node& c = *a.edge[k];
+        static int list[MAX_N];
+        static double D[MAX_N];
+        for (int j = 0; j + 1 < N; ++j) {
+          list[j] = j;
+          D[j] = dist(a, node[j]);
+        }
+        sort(list, list + N - 1, [](int a, int b) { return D[a] < D[b]; });
+        assert(i == list[0]);
+        int T = 10;
+        for (int j = 1; j < T; ++j) {
+          Node& b = node[list[j]];
+          for (int k = j + 1; k < T; ++k) {
+            Node& c = node[list[k]];
             fermatPoint(a, b, c, d);
             if (d.x < 0) continue;
-            d.x = round(d.x);
-            d.y = round(d.y);
-            double v =
-                dist(a, b) + dist(a, c) - dist(d, a) - dist(d, b) - dist(d, c);
+            double v = current - prim();
             if (value < v) {
               value = v;
               x = d.x;
@@ -194,7 +199,7 @@ class RoadsAndJunctions {
           }
         }
       }
-      if (value * (1 - failureProbability) <= junctionCost) break;
+      if (value * (1 - failureProbability) <= junctionCost + 1e-5) break;
       pos[ps][0] = x;
       pos[ps][1] = y;
       ++ps;
@@ -209,16 +214,45 @@ class RoadsAndJunctions {
             pos[i - NC][0] = pos[ps][0];
             pos[i - NC][1] = pos[ps][1];
             --i;
-          } else if (n.size == 3) {
-            fermatPoint(*n.edge[0], *n.edge[1], *n.edge[2], n);
-            pos[i - NC][0] = n.x;
-            pos[i - NC][1] = n.y;
+          }
+        }
+        init();
+        prim();
+        for (int i = NC; i < NC + ps; ++i) {
+          Node& n = node[i];
+          assert(n.size == 3);
+          fermatPoint(*n.edge[0], *n.edge[1], *n.edge[2], n);
+          pos[i - NC][0] = n.x;
+          pos[i - NC][1] = n.y;
+        }
+      }
+    }
+    if (false) {
+      init();
+      int minx = 0xffff, maxx = 0;
+      int miny = 0xffff, maxy = 0;
+      for (int i = 0; i < NC; ++i) {
+        Node& n = node[i];
+        if (minx > n.x) minx = n.x;
+        if (maxx < n.x) maxx = n.x;
+        if (miny > n.y) miny = n.y;
+        if (maxy < n.y) maxy = n.y;
+      }
+      double x = prim();
+      Node& n = node[N++];
+      for (n.x = minx; n.x <= maxx; ++n.x) {
+        for (n.y = miny; n.y <= maxy; ++n.y) {
+          double t = prim();
+          if ((x - t - 1e-3) * (1 - failureProbability) > junctionCost) {
+            cerr << x << " " << t << endl;
+            assert(false);
           }
         }
       }
     }
     {
       init();
+      prim();
       constexpr int MAX = 6;
       double prob[MAX + 1][MAX + 1];
       {
@@ -251,7 +285,6 @@ class RoadsAndJunctions {
       for (int i = NC; i < PN; ++i) {
         vector<int> nl;
         Node& n = node[i];
-        assert(n.size == 3);
         auto add = [&](int a, int b) {
           for (int i = 0; i < 4; ++i) {
             int x = a + dx[i];
