@@ -4,6 +4,7 @@ import threading
 import queue
 import json
 import sys
+import os
 
 subprocess.call('g++ --std=c++0x -W -Wall -O2 -s -pipe -mmmx -msse -msse2 -msse3 -o out/main.out {}'.format(sys.argv[1]), shell=True)
 subprocess.call('javac -d out src/RoadsAndJunctionsVis.java', shell=True)
@@ -47,9 +48,13 @@ def worker():
         seed = q.get()
         if seed is None:
             break
-        score = solve(seed)
-        state.add(seed, score)
-        q.task_done()
+        try:
+            score = solve(seed)
+            state.add(seed, score)
+            q.task_done()
+        except ValueError as err:
+            print("seed {} : {}".format(seed, err))
+            os._exit(1)
 
 num_worker_threads = 4
 threads = []

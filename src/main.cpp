@@ -136,8 +136,7 @@ double prim() {
   }
 }
 
-double prim(vector<int>& p) {
-  int N = p.size();
+double prim(int* p, int N) {
   static double mincost[MAX_N];
   static bool used[MAX_N];
   for (int i = 0; i < N; ++i) {
@@ -253,74 +252,25 @@ class RoadsAndJunctions {
         }
       }
     }
-    if (false) {
-      init();
-      int minx = 0xffff, maxx = 0;
-      int miny = 0xffff, maxy = 0;
-      for (int i = 0; i < NC; ++i) {
-        Node& n = node[i];
-        if (minx > n.x) minx = n.x;
-        if (maxx < n.x) maxx = n.x;
-        if (miny > n.y) miny = n.y;
-        if (maxy < n.y) maxy = n.y;
-      }
-      double x = prim();
-      Node& n = node[N++];
-      for (n.x = minx; n.x <= maxx; ++n.x) {
-        for (n.y = miny; n.y <= maxy; ++n.y) {
-          double t = prim();
-          if ((x - t - 1e-3) * (1 - failureProbability) > junctionCost) {
-            cerr << x << " " << t << endl;
-            assert(false);
-          }
-        }
-      }
-    }
-    if (false) {
-      init();
-      double t = prim();
-      for (int i = NC; i < N; ++i) {
-        Node& n = node[i];
-        constexpr int dx[] = {0, 1, 0, -1, 1, 1, -1, -1};
-        constexpr int dy[] = {1, 0, -1, 0, 1, -1, 1, -1};
-        int x = n.x;
-        int y = n.y;
-        for (int j = 0; j < 8; ++j) {
-          n.x = x + dx[j];
-          n.y = y + dy[j];
-          double u = prim();
-          if (t > u) {
-            cerr << t << " " << u << " " << x << " " << y << " " << n.x << " "
-                 << n.y << endl;
-            assert(false);
-          }
-        }
-        n.x = x;
-        n.y = y;
-      }
-    }
     {
       init();
       prim();
       constexpr int MAX = 4;
       double prob[MAX + 1][MAX + 1];
-      {
-        memset(prob, 0, sizeof(prob));
-        prob[0][0] = 1;
-        for (int i = 0; i < MAX; ++i) {
-          for (int j = 0; j < MAX; ++j) {
-            prob[i + 1][j] += prob[i][j] * failureProbability;
-            prob[i + 1][j + 1] += prob[i][j] * (1 - failureProbability);
-          }
+      memset(prob, 0, sizeof(prob));
+      prob[0][0] = 1;
+      for (int i = 0; i < MAX; ++i) {
+        for (int j = 0; j < MAX; ++j) {
+          prob[i + 1][j] += prob[i][j] * failureProbability;
+          prob[i + 1][j + 1] += prob[i][j] * (1 - failureProbability);
         }
-        int comb[MAX + 1][MAX + 1];
-        for (int i = 0; i <= MAX; ++i) {
-          comb[i][0] = 1;
-          if (i == 0) continue;
-          for (int j = 1; j <= i; ++j) {
-            comb[i][j] = comb[i - 1][j - 1] + comb[i - 1][j];
-            prob[i][j] /= comb[i][j];
-          }
+      }
+      int comb[MAX + 1][MAX + 1];
+      for (int i = 0; i <= MAX; ++i) {
+        comb[i][0] = 1;
+        if (i == 0) continue;
+        for (int j = 1; j <= i; ++j) {
+          comb[i][j] = comb[i - 1][j - 1] + comb[i - 1][j];
         }
       }
       constexpr int SIZE = 1 << 10;
@@ -328,7 +278,8 @@ class RoadsAndJunctions {
       memset(used, false, sizeof(used));
       int PN = N;
       for (int i = NC; i < PN; ++i) {
-        vector<int> nl;
+        static int nl[32];
+        int nls = 0;
         Node& n = node[i];
         assert(n.size == 3);
         auto add = [&](int a, int b) {
@@ -341,38 +292,40 @@ class RoadsAndJunctions {
             if (y < 0 || SIZE <= y) continue;
             if (used[x][y]) continue;
             used[x][y] = true;
-            nl.push_back((x << 16) | y);
+            nl[nls++] = (x << 16) | y;
           }
         };
         add(n.x, n.y);
-        auto exp = [&](vector<int>& v) {
-          int s = v.size();
-          double x = junctionCost * s;
-          static vector<int> p;
-          p.resize(n.size);
+        static int cl[8];
+        int cls = 0;
+        auto exp = [&]() {
+          static int p[8];
+          int ps = 0;
           for (int i = 0; i < n.size; ++i) {
             Node& t = *n.edge[i];
-            p[i] = (t.x << 16) | t.y;
+            p[ps++] = (t.x << 16) | t.y;
           }
-          for (int i = 0; i < (1 << s); ++i) {
-            p.resize(n.size);
-            for (int j = 0; j < s; ++j) {
-              if (i & (1 << j)) p.push_back(v[j]);
+          double x = junctionCost * cls;
+          for (int i = 0; i < (1 << cls); ++i) {
+            ps = n.size;
+            for (int j = 0; j < cls; ++j) {
+              if (i & (1 << j)) p[ps++] = cl[j];
             }
-            x += prim(p) * prob[s][bitset<MAX>(i).count()];
+            int b = bitset<MAX>(i).count();
+            x += prim(p, ps) * prob[cls][b] / comb[cls][b];
           }
           return x;
         };
-        vector<int> cl{(n.x << 16) | n.y};
-        double e = exp(cl);
+        cl[cls++] = (n.x << 16) | n.y;
+        double e = exp();
         for (int m = 1; m < MAX; ++m) {
           int p = -1;
-          int s = cl.size();
           double v = 1e10;
-          cl.push_back(-1);
-          for (int t : nl) {
-            cl[s] = t;
-            double d = exp(cl);
+          ++cls;
+          for (int i = 0; i < nls; ++i) {
+            int t = nl[i];
+            cl[cls - 1] = t;
+            double d = exp();
             if (v > d) {
               v = d;
               p = t;
@@ -380,10 +333,12 @@ class RoadsAndJunctions {
           }
           if (e > v) {
             e = v;
-            cl[s] = p;
+            cl[cls - 1] = p;
             int x = p >> 16;
             int y = p & ((1 << 16) - 1);
-            nl.erase(remove(nl.begin(), nl.end(), p), nl.end());
+            for (int i = 0; i < nls; ++i) {
+              if (nl[i] == p) nl[i--] = nl[--nls];
+            }
             add(x, y);
             pos[ps][0] = x;
             pos[ps][1] = y;
