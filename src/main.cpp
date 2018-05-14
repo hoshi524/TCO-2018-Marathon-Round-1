@@ -69,6 +69,8 @@ void fermatPoint(double x1, double y1, double x2, double y2, double x3,
 }
 
 constexpr int MAX_N = 1 << 8;
+constexpr int dx[] = {0, 1, 0, -1, 0, 1, 1, -1, -1};
+constexpr int dy[] = {1, 0, -1, 0, 0, 1, -1, 1, -1};
 int N, NC;
 
 struct Node {
@@ -250,6 +252,72 @@ class RoadsAndJunctions {
             pos[i - NC][1] = n.y;
           }
         }
+        {
+          init();
+          prim();
+          static bool used[MAX_N];
+          memset(used, false, sizeof(used));
+          for (int i = NC; i < N; ++i) {
+            if (used[i]) continue;
+            used[i] = true;
+            static int q[8];
+            int qs = 0;
+            q[qs++] = i;
+            for (int j = 0; j < qs; ++j) {
+              Node& n = node[q[j]];
+              for (int k = 0; k < n.size; ++k) {
+                Node& u = *n.edge[k];
+                if (u.id < NC or used[u.id]) continue;
+                used[u.id] = true;
+                q[qs++] = u.id;
+              }
+            }
+            if (qs == 1) continue;
+            if (qs > 3) qs = 3;
+            static int p[32];
+            int ps = 0;
+            for (int i = 0; i < qs; ++i) {
+              Node& n = node[q[i]];
+              p[ps++] = (n.x << 16) | n.y;
+            }
+            for (int i = 0; i < qs; ++i) {
+              Node& n = node[q[i]];
+              for (int i = 0; i < n.size; ++i) {
+                Node& u = *n.edge[i];
+                if (u.id < NC) p[ps++] = (u.x << 16) | u.y;
+              }
+            }
+            double v = prim(p, ps);
+            constexpr int S = 9;
+            while (true) {
+              int r = -1;
+              for (int t = 0, te = pow(S, qs); t < te; ++t) {
+                int u = t;
+                for (int i = 0; i < qs; ++i) {
+                  int j = u % S;
+                  u /= S;
+                  Node& n = node[q[i]];
+                  int x = n.x + dx[j];
+                  int y = n.y + dy[j];
+                  p[i] = (x << 16) | y;
+                }
+                double w = prim(p, ps);
+                if (v > w) {
+                  v = w;
+                  r = t;
+                }
+              }
+              if (r == -1) break;
+              for (int i = 0; i < qs; ++i) {
+                int j = r % S;
+                r /= S;
+                Node& n = node[q[i]];
+                pos[n.id - NC][0] = n.x += dx[j];
+                pos[n.id - NC][1] = n.y += dy[j];
+              }
+            }
+          }
+        }
       }
     }
     {
@@ -283,8 +351,6 @@ class RoadsAndJunctions {
         Node& n = node[i];
         assert(n.size == 3);
         auto add = [&](int a, int b) {
-          constexpr int dx[] = {0, 1, 0, -1};
-          constexpr int dy[] = {1, 0, -1, 0};
           for (int i = 0; i < 4; ++i) {
             int x = a + dx[i];
             int y = b + dy[i];
