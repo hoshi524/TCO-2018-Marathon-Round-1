@@ -331,8 +331,6 @@ class RoadsAndJunctions {
       }
     }
     {
-      init();
-      prim();
       constexpr int MAX = 4;
       double prob[MAX + 1][MAX + 1];
       memset(prob, 0, sizeof(prob));
@@ -354,8 +352,9 @@ class RoadsAndJunctions {
       constexpr int SIZE = 1 << 10;
       bool used[SIZE][SIZE];
       memset(used, false, sizeof(used));
-      int PN = N;
-      for (int i = NC; i < PN; ++i) {
+      for (int i = NC, PN = NC + ps; i < PN; ++i) {
+        init();
+        prim();
         static int nl[32];
         int nls = 0;
         Node& n = node[i];
