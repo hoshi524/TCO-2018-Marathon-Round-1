@@ -1,5 +1,14 @@
 #include <bits/stdc++.h>
+#include <sys/time.h>
 using namespace std;
+
+constexpr double ticks_per_sec = 2800000000;
+constexpr double ticks_per_sec_inv = 1.0 / ticks_per_sec;
+inline double rdtsc() {
+  uint32_t lo, hi;
+  asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
+  return (((uint64_t)hi << 32) | lo) * ticks_per_sec_inv;
+}
 
 inline double dist(double x1, double y1, double x2, double y2) {
   double x = x1 - x2;
@@ -173,6 +182,7 @@ class RoadsAndJunctions {
  public:
   vector<int> buildJunctions(int S, const vector<int>& cities,
                              double junctionCost, double failureProbability) {
+    double start = rdtsc();
     for (int i = 0; i < MAX_N; ++i) {
       node[i].id = i;
     }
@@ -252,7 +262,7 @@ class RoadsAndJunctions {
             pos[i - NC][1] = n.y;
           }
         }
-        {
+        if (rdtsc() - start < 5) {
           init();
           prim();
           static bool used[MAX_N];
