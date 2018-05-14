@@ -1,7 +1,7 @@
 #include <bits/stdc++.h>
 using namespace std;
 
-double dist(double x1, double y1, double x2, double y2) {
+inline double dist(double x1, double y1, double x2, double y2) {
   double x = x1 - x2;
   double y = y1 - y2;
   return sqrt(x * x + y * y);
@@ -68,9 +68,7 @@ void fermatPoint(double x1, double y1, double x2, double y2, double x3,
   check(angle(x3, y3, x, y, x1, y1));
 }
 
-constexpr double TIME_LIMIT = 2;
 constexpr int MAX_N = 1 << 8;
-
 int N, NC;
 
 struct Node {
@@ -272,7 +270,7 @@ class RoadsAndJunctions {
     {
       init();
       prim();
-      constexpr int MAX = 6;
+      constexpr int MAX = 4;
       double prob[MAX + 1][MAX + 1];
       {
         memset(prob, 0, sizeof(prob));
@@ -324,7 +322,7 @@ class RoadsAndJunctions {
         add(n.x, n.y);
         auto exp = [&](vector<int>& v) {
           int s = v.size();
-          double x = junctionCost * v.size();
+          double x = junctionCost * s;
           for (int i = 0; i < (1 << s); ++i) {
             int b = bitset<MAX>(i).count();
             static double D[3];
@@ -335,9 +333,7 @@ class RoadsAndJunctions {
               int y = v[j] & ((1 << 16) - 1);
               for (int k = 0; k < 3; ++k) {
                 double d = dist(x, y, n.edge[k]->x, n.edge[k]->y);
-                if (D[k] > d) {
-                  D[k] = d;
-                }
+                if (D[k] > d) D[k] = d;
               }
             }
             double d = i == 0 ? d0 : (b - 1) + D[0] + D[1] + D[2];
@@ -408,8 +404,8 @@ class RoadsAndJunctions {
   }
 
   vector<int> buildRoads(const vector<int>& junctionStatus) {
-    for (int i = 0; i < N; ++i) {
-      node[i].used = i < NC ? false : junctionStatus[i - NC] == 0;
+    for (int i = NC; i < N; ++i) {
+      node[i].used = junctionStatus[i - NC] == 0;
     }
     prim();
     vector<int> ret;
