@@ -210,14 +210,16 @@ class RoadsAndJunctions {
             --i;
           }
         }
-        init();
-        prim();
-        for (int i = NC; i < NC + ps; ++i) {
-          Node& n = node[i];
-          assert(n.size > 2);
-          fermatPoint(*n.edge[0], *n.edge[1], *n.edge[2], n);
-          pos[i - NC][0] = n.x;
-          pos[i - NC][1] = n.y;
+        for (int t = 0; t < 8; ++t) {
+          init();
+          prim();
+          for (int i = NC; i < NC + ps; ++i) {
+            Node& n = node[i];
+            assert(n.size > 2);
+            fermatPoint(*n.edge[0], *n.edge[1], *n.edge[2], n);
+            pos[i - NC][0] = n.x;
+            pos[i - NC][1] = n.y;
+          }
         }
       }
     }
@@ -242,6 +244,29 @@ class RoadsAndJunctions {
             assert(false);
           }
         }
+      }
+    }
+    if (false) {
+      init();
+      double t = prim();
+      for (int i = NC; i < N; ++i) {
+        Node& n = node[i];
+        constexpr int dx[] = {0, 1, 0, -1, 1, 1, -1, -1};
+        constexpr int dy[] = {1, 0, -1, 0, 1, -1, 1, -1};
+        int x = n.x;
+        int y = n.y;
+        for (int j = 0; j < 8; ++j) {
+          n.x = x + dx[j];
+          n.y = y + dy[j];
+          double u = prim();
+          if (t > u) {
+            cerr << t << " " << u << " " << x << " " << y << " " << n.x << " "
+                 << n.y << endl;
+            assert(false);
+          }
+        }
+        n.x = x;
+        n.y = y;
       }
     }
     {
