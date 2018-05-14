@@ -136,6 +136,38 @@ double prim() {
   }
 }
 
+double prim(vector<int>& p) {
+  int N = p.size();
+  static double mincost[MAX_N];
+  static bool used[MAX_N];
+  for (int i = 0; i < N; ++i) {
+    mincost[i] = 100000;
+    used[i] = false;
+  }
+  int v = 0;
+  mincost[v] = 0;
+  double d = 0;
+  while (true) {
+    used[v] = true;
+    int nv = -1;
+    int x1 = p[v] >> 16;
+    int y1 = p[v] & ((1 << 16) - 1);
+    for (int u = 1; u < N; ++u) {
+      if (used[u]) continue;
+      int x2 = p[u] >> 16;
+      int y2 = p[u] & ((1 << 16) - 1);
+      double d = dist(x1, y1, x2, y2);
+      if (mincost[u] > d) {
+        mincost[u] = d;
+      }
+      if (nv == -1 or mincost[u] < mincost[nv]) nv = u;
+    }
+    if (nv == -1) return d;
+    v = nv;
+    d += mincost[v];
+  }
+}
+
 class RoadsAndJunctions {
  public:
   vector<int> buildJunctions(int S, const vector<int>& cities,
@@ -292,8 +324,6 @@ class RoadsAndJunctions {
         }
       }
       constexpr int SIZE = 1 << 10;
-      constexpr int dx[] = {0, 1, 0, -1};
-      constexpr int dy[] = {1, 0, -1, 0};
       bool used[SIZE][SIZE];
       memset(used, false, sizeof(used));
       int PN = N;
@@ -302,6 +332,8 @@ class RoadsAndJunctions {
         Node& n = node[i];
         assert(n.size == 3);
         auto add = [&](int a, int b) {
+          constexpr int dx[] = {0, 1, 0, -1};
+          constexpr int dy[] = {1, 0, -1, 0};
           for (int i = 0; i < 4; ++i) {
             int x = a + dx[i];
             int y = b + dy[i];
@@ -312,32 +344,22 @@ class RoadsAndJunctions {
             nl.push_back((x << 16) | y);
           }
         };
-        double d0;
-        {
-          double a = dist(*n.edge[0], *n.edge[1]);
-          double b = dist(*n.edge[1], *n.edge[2]);
-          double c = dist(*n.edge[2], *n.edge[0]);
-          d0 = a + b + c - max({a, b, c});
-        }
         add(n.x, n.y);
         auto exp = [&](vector<int>& v) {
           int s = v.size();
           double x = junctionCost * s;
+          static vector<int> p;
+          p.resize(n.size);
+          for (int i = 0; i < n.size; ++i) {
+            Node& t = *n.edge[i];
+            p[i] = (t.x << 16) | t.y;
+          }
           for (int i = 0; i < (1 << s); ++i) {
-            int b = bitset<MAX>(i).count();
-            static double D[3];
-            for (int j = 0; j < 3; ++j) D[j] = 1e10;
+            p.resize(n.size);
             for (int j = 0; j < s; ++j) {
-              if ((i & (1 << j)) == 0) continue;
-              int x = v[j] >> 16;
-              int y = v[j] & ((1 << 16) - 1);
-              for (int k = 0; k < 3; ++k) {
-                double d = dist(x, y, n.edge[k]->x, n.edge[k]->y);
-                if (D[k] > d) D[k] = d;
-              }
+              if (i & (1 << j)) p.push_back(v[j]);
             }
-            double d = i == 0 ? d0 : (b - 1) + D[0] + D[1] + D[2];
-            x += d * prob[s][b];
+            x += prim(p) * prob[s][bitset<MAX>(i).count()];
           }
           return x;
         };
@@ -345,24 +367,20 @@ class RoadsAndJunctions {
         double e = exp(cl);
         for (int m = 1; m < MAX; ++m) {
           int p = -1;
+          int s = cl.size();
           double v = 1e10;
+          cl.push_back(-1);
           for (int t : nl) {
-            int x = t >> 16;
-            int y = t & ((1 << 16) - 1);
-            double d = 0;
-            for (int i = 0; i < n.size; ++i) {
-              d += dist(x, y, n.edge[i]->x, n.edge[i]->y);
-            }
+            cl[s] = t;
+            double d = exp(cl);
             if (v > d) {
               v = d;
               p = t;
             }
           }
-          if (p == -1) break;
-          cl.push_back(p);
-          double ne = exp(cl);
-          if (e > ne) {
-            e = ne;
+          if (e > v) {
+            e = v;
+            cl[s] = p;
             int x = p >> 16;
             int y = p & ((1 << 16) - 1);
             nl.erase(remove(nl.begin(), nl.end(), p), nl.end());
