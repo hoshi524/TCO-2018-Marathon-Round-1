@@ -78,8 +78,8 @@ void fermatPoint(double x1, double y1, double x2, double y2, double x3,
 }
 
 constexpr int MAX_N = 1 << 8;
-constexpr int dx[] = {0, 1, 0, -1, 0, 1, 1, -1, -1};
-constexpr int dy[] = {1, 0, -1, 0, 0, 1, -1, 1, -1};
+constexpr int dx[] = {0, 1, 0, -1, 1, 1, -1, -1, 0};
+constexpr int dy[] = {1, 0, -1, 0, 1, -1, 1, -1, 0};
 int N, NC;
 
 struct Node {
@@ -360,11 +360,12 @@ class RoadsAndJunctions {
         Node& n = node[i];
         assert(n.size == 3);
         auto add = [&](int a, int b) {
+          used[a][b] = true;
           for (int i = 0; i < 4; ++i) {
             int x = a + dx[i];
             int y = b + dy[i];
-            if (x < 0 || SIZE <= x) continue;
-            if (y < 0 || SIZE <= y) continue;
+            if (x < 0 || S <= x) continue;
+            if (y < 0 || S <= y) continue;
             if (used[x][y]) continue;
             used[x][y] = true;
             nl[nls++] = (x << 16) | y;
