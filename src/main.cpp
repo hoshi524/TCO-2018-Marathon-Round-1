@@ -194,40 +194,68 @@ class RoadsAndJunctions {
       }
     };
     while (true) {
-      double value = -1, x = -1, y = -1;
-      init();
-      double current = prim();
-      Node& d = node[N++];
-      for (int i = 0; i + 1 < N; ++i) {
-        Node& a = node[i];
-        static int list[MAX_N];
-        static double D[MAX_N];
-        for (int j = 0; j + 1 < N; ++j) {
-          list[j] = j;
-          D[j] = dist(a, node[j]);
-        }
-        sort(list, list + N - 1, [](int a, int b) { return D[a] < D[b]; });
-        assert(i == list[0]);
-        int T = 10;
-        for (int j = 1; j < T; ++j) {
-          Node& b = node[list[j]];
-          for (int k = j + 1; k < T; ++k) {
-            Node& c = node[list[k]];
-            fermatPoint(a, b, c, d);
-            if (d.x < 0) continue;
-            double v = current - prim();
-            if (value < v) {
-              value = v;
-              x = d.x;
-              y = d.y;
+      {
+        double value = -1;
+        int x = -1, y = -1;
+        init();
+        double current = prim();
+        double current_ = current + N * junctionCost;
+        Node& d = node[N++];
+        for (int i = 0; i + 1 < N; ++i) {
+          Node& a = node[i];
+          static int list[MAX_N];
+          static double D[MAX_N];
+          for (int j = 0; j + 1 < N; ++j) {
+            list[j] = j;
+            D[j] = dist(a, node[j]);
+          }
+          sort(list, list + N - 1, [](int a, int b) { return D[a] < D[b]; });
+          assert(i == list[0]);
+          int T = 10;
+          for (int j = 1; j < T; ++j) {
+            Node& b = node[list[j]];
+            for (int k = j + 1; k < T; ++k) {
+              Node& c = node[list[k]];
+              fermatPoint(a, b, c, d);
+              if (d.x < 0) continue;
+              double v = prim();
+              if (d.size < 3) continue;
+              int r = 0;
+              for (int i = NC; i < N; ++i) {
+                if (node[i].size < 3) {
+                  node[i].used = true;
+                  ++r;
+                }
+              }
+              if (r == 0) {
+                v = current - v;
+                if (v * (1 - failureProbability) < junctionCost + 1e-5)
+                  continue;
+                if (value < v) {
+                  value = v;
+                  x = d.x;
+                  y = d.y;
+                }
+              } else {
+                v = prim();
+                for (int i = NC; i < N; ++i) {
+                  node[i].used = false;
+                }
+                if (v + (N - r) * junctionCost < current_ - 1e-5) {
+                  x = d.x;
+                  y = d.y;
+                  goto OUT;
+                }
+              }
             }
           }
         }
+        if (x == -1) break;
+      OUT:
+        pos[ps][0] = x;
+        pos[ps][1] = y;
+        ++ps;
       }
-      if (value * (1 - failureProbability) <= junctionCost + 1e-5) break;
-      pos[ps][0] = x;
-      pos[ps][1] = y;
-      ++ps;
       {
         init();
         prim();
@@ -247,6 +275,8 @@ class RoadsAndJunctions {
           for (int i = NC; i < N; ++i) {
             if (used[i]) continue;
             used[i] = true;
+            init();
+            double value = prim();
             static int q[8];
             int qs = 0;
             q[qs++] = i;
@@ -259,8 +289,6 @@ class RoadsAndJunctions {
                 q[qs++] = u.id;
               }
             }
-            init();
-            prim();
             static double P[8 * 3][2];
             static int edge[8][3];
             static int toIndex[MAX_N];
@@ -291,7 +319,7 @@ class RoadsAndJunctions {
                 edge[j][k] = toIndex[edge[j][k]];
               }
             }
-            for (int t = 0; t < 8; ++t) {
+            for (int t = 0, te = qs == 1 ? 1 : 8; t < te; ++t) {
               for (int j = 0; j < qs; ++j) {
                 double* a = P[j];
                 double* b = P[edge[j][0]];
@@ -300,11 +328,9 @@ class RoadsAndJunctions {
                 fermatPoint(b[0], b[1], c[0], c[1], d[0], d[1], a[0], a[1]);
               }
             }
-            double value = 1e10;
-            int x = -1;
-            constexpr int dx[] = {0, 1, 0, 1};
-            constexpr int dy[] = {0, 0, 1, 1};
             auto set = [&](int u) {
+              constexpr int dx[] = {0, 1, 0, 1};
+              constexpr int dy[] = {0, 0, 1, 1};
               for (int j = 0; j < qs; ++j) {
                 int k = u % 4;
                 u /= 4;
@@ -313,6 +339,7 @@ class RoadsAndJunctions {
                 n.y = (int)P[j][1] + dy[k];
               }
             };
+            int x = -1;
             for (int t = 0, te = pow(4, qs); t < te; ++t) {
               set(t);
               double d = prim();
@@ -321,11 +348,13 @@ class RoadsAndJunctions {
                 x = t;
               }
             }
-            set(x);
-            for (int j = 0; j < qs; ++j) {
-              Node& n = node[q[j]];
-              pos[n.id - NC][0] = n.x;
-              pos[n.id - NC][1] = n.y;
+            if (x != -1) {
+              set(x);
+              for (int j = 0; j < qs; ++j) {
+                Node& n = node[q[j]];
+                pos[n.id - NC][0] = n.x;
+                pos[n.id - NC][1] = n.y;
+              }
             }
           }
         }
