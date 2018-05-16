@@ -38,7 +38,7 @@ class State:
         with self.lock:
             self.count = self.count + 1
             self.rate = (self.rate * (self.count - 1) + nom) / self.count
-            print('{}\t{}\t{}\t{}'.format(seed, score, nom, self.rate))
+            print('{}\t{:8.2f}\t{}\t{}'.format(seed, score, nom, self.rate))
 
 state = State()
 q = queue.Queue()
