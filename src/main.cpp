@@ -1,14 +1,5 @@
 #include <bits/stdc++.h>
-#include <sys/time.h>
 using namespace std;
-
-constexpr double ticks_per_sec = 2800000000;
-constexpr double ticks_per_sec_inv = 1.0 / ticks_per_sec;
-inline double rdtsc() {
-  uint32_t lo, hi;
-  asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
-  return (((uint64_t)hi << 32) | lo) * ticks_per_sec_inv;
-}
 
 inline double dist(double x1, double y1, double x2, double y2) {
   double x = x1 - x2;
@@ -182,7 +173,6 @@ class RoadsAndJunctions {
  public:
   vector<int> buildJunctions(int S, const vector<int>& cities,
                              double junctionCost, double failureProbability) {
-    double start = rdtsc();
     for (int i = 0; i < MAX_N; ++i) {
       node[i].id = i;
     }
@@ -251,20 +241,7 @@ class RoadsAndJunctions {
             --i;
           }
         }
-        for (int t = 0; t < 8; ++t) {
-          init();
-          prim();
-          for (int i = NC; i < NC + ps; ++i) {
-            Node& n = node[i];
-            assert(n.size > 2);
-            fermatPoint(*n.edge[0], *n.edge[1], *n.edge[2], n);
-            pos[i - NC][0] = n.x;
-            pos[i - NC][1] = n.y;
-          }
-        }
-        if (rdtsc() - start < 5) {
-          init();
-          prim();
+        {
           static bool used[MAX_N];
           memset(used, false, sizeof(used));
           for (int i = NC; i < N; ++i) {
@@ -282,49 +259,73 @@ class RoadsAndJunctions {
                 q[qs++] = u.id;
               }
             }
-            if (qs == 1) continue;
-            if (qs > 3) qs = 3;
-            static int p[32];
+            init();
+            prim();
+            static double P[8 * 3][2];
+            static int edge[8][3];
+            static int toIndex[MAX_N];
             int ps = 0;
-            for (int i = 0; i < qs; ++i) {
-              Node& n = node[q[i]];
-              p[ps++] = (n.x << 16) | n.y;
+            for (int j = 0; j < qs; ++j) {
+              Node& n = node[q[j]];
+              assert(n.id >= NC);
+              toIndex[n.id] = ps;
+              P[ps][0] = n.x;
+              P[ps][1] = n.y;
+              ++ps;
             }
-            for (int i = 0; i < qs; ++i) {
-              Node& n = node[q[i]];
-              for (int i = 0; i < n.size; ++i) {
-                Node& u = *n.edge[i];
-                if (u.id < NC) p[ps++] = (u.x << 16) | u.y;
+            for (int j = 0; j < qs; ++j) {
+              Node& n = node[q[j]];
+              assert(n.size > 2);
+              for (int k = 0; k < 3; ++k) {
+                Node& u = *n.edge[k];
+                edge[j][k] = u.id;
+                if (u.id >= NC) continue;
+                toIndex[u.id] = ps;
+                P[ps][0] = u.x;
+                P[ps][1] = u.y;
+                ++ps;
               }
             }
-            double v = prim(p, ps);
-            constexpr int S = 9;
-            while (true) {
-              int r = -1;
-              for (int t = 0, te = pow(S, qs); t < te; ++t) {
-                int u = t;
-                for (int i = 0; i < qs; ++i) {
-                  int j = u % S;
-                  u /= S;
-                  Node& n = node[q[i]];
-                  int x = n.x + dx[j];
-                  int y = n.y + dy[j];
-                  p[i] = (x << 16) | y;
-                }
-                double w = prim(p, ps);
-                if (v > w) {
-                  v = w;
-                  r = t;
-                }
+            for (int j = 0; j < qs; ++j) {
+              for (int k = 0; k < 3; ++k) {
+                edge[j][k] = toIndex[edge[j][k]];
               }
-              if (r == -1) break;
-              for (int i = 0; i < qs; ++i) {
-                int j = r % S;
-                r /= S;
-                Node& n = node[q[i]];
-                pos[n.id - NC][0] = n.x += dx[j];
-                pos[n.id - NC][1] = n.y += dy[j];
+            }
+            for (int t = 0; t < 8; ++t) {
+              for (int j = 0; j < qs; ++j) {
+                double* a = P[j];
+                double* b = P[edge[j][0]];
+                double* c = P[edge[j][1]];
+                double* d = P[edge[j][2]];
+                fermatPoint(b[0], b[1], c[0], c[1], d[0], d[1], a[0], a[1]);
               }
+            }
+            double value = 1e10;
+            int x = -1;
+            constexpr int dx[] = {0, 1, 0, 1};
+            constexpr int dy[] = {0, 0, 1, 1};
+            auto set = [&](int u) {
+              for (int j = 0; j < qs; ++j) {
+                int k = u % 4;
+                u /= 4;
+                Node& n = node[q[j]];
+                n.x = (int)P[j][0] + dx[k];
+                n.y = (int)P[j][1] + dy[k];
+              }
+            };
+            for (int t = 0, te = pow(4, qs); t < te; ++t) {
+              set(t);
+              double d = prim();
+              if (value > d) {
+                value = d;
+                x = t;
+              }
+            }
+            set(x);
+            for (int j = 0; j < qs; ++j) {
+              Node& n = node[q[j]];
+              pos[n.id - NC][0] = n.x;
+              pos[n.id - NC][1] = n.y;
             }
           }
         }
@@ -332,23 +333,6 @@ class RoadsAndJunctions {
     }
     {
       constexpr int MAX = 4;
-      double prob[MAX + 1][MAX + 1];
-      memset(prob, 0, sizeof(prob));
-      prob[0][0] = 1;
-      for (int i = 0; i < MAX; ++i) {
-        for (int j = 0; j < MAX; ++j) {
-          prob[i + 1][j] += prob[i][j] * failureProbability;
-          prob[i + 1][j + 1] += prob[i][j] * (1 - failureProbability);
-        }
-      }
-      int comb[MAX + 1][MAX + 1];
-      for (int i = 0; i <= MAX; ++i) {
-        comb[i][0] = 1;
-        if (i == 0) continue;
-        for (int j = 1; j <= i; ++j) {
-          comb[i][j] = comb[i - 1][j - 1] + comb[i - 1][j];
-        }
-      }
       constexpr int SIZE = 1 << 10;
       bool used[SIZE][SIZE];
       memset(used, false, sizeof(used));
@@ -372,23 +356,23 @@ class RoadsAndJunctions {
           }
         };
         add(n.x, n.y);
-        static int cl[8];
-        int cls = 0;
+        static int cl[8], pl[MAX_N];
+        int cls = 0, pls = 0;
+        for (int j = 0; j < N; ++j) {
+          if (j == i) continue;
+          Node& n = node[j];
+          pl[pls++] = (n.x << 16) | n.y;
+        }
         auto exp = [&]() {
-          static int p[8];
-          int ps = 0;
-          for (int i = 0; i < n.size; ++i) {
-            Node& t = *n.edge[i];
-            p[ps++] = (t.x << 16) | t.y;
-          }
           double x = junctionCost * cls;
           for (int i = 0; i < (1 << cls); ++i) {
-            ps = n.size;
+            pls = N - 1;
             for (int j = 0; j < cls; ++j) {
-              if (i & (1 << j)) p[ps++] = cl[j];
+              if (i & (1 << j)) pl[pls++] = cl[j];
             }
             int b = bitset<MAX>(i).count();
-            x += prim(p, ps) * prob[cls][b] / comb[cls][b];
+            double p = failureProbability;
+            x += prim(pl, pls) * pow(1 - p, b) * pow(p, cls - b);
           }
           return x;
         };
